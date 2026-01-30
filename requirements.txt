@@ -1,20 +1,25 @@
-# Stock Monitoring System - Python Dependencies
-# Install with: pip install -r requirements.txt
+# Stock Monitoring System - Dependencies
+# Interactive LINE Chatbot Version
 
-# Yahoo Finance API wrapper
-# Used for fetching real-time stock prices
+# Web Framework
+flask>=3.0.0
+gunicorn>=21.0.0
+
+# LINE Bot SDK v3
+line-bot-sdk>=3.5.0
+
+# Yahoo Finance
 yfinance>=0.2.36
 
-# HTTP requests library
-# Used for LINE Messaging API calls
+# HTTP Requests
 requests>=2.31.0
 
-# Data manipulation (dependency of yfinance)
+# Data Processing
 pandas>=2.0.0
-
-# Numerical operations (dependency of yfinance)
 numpy>=1.24.0
 
 # Google Gemini AI
-# Used for AI-powered stock analysis
 google-generativeai>=0.3.0
+
+# Firebase Admin SDK
+firebase-admin>=6.2.0
