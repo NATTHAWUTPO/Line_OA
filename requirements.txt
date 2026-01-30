@@ -6,7 +6,7 @@
 yfinance>=0.2.36
 
 # HTTP requests library
-# Used for LINE Notify API calls
+# Used for LINE Messaging API calls
 requests>=2.31.0
 
 # Data manipulation (dependency of yfinance)
@@ -14,3 +14,7 @@ pandas>=2.0.0
 
 # Numerical operations (dependency of yfinance)
 numpy>=1.24.0
+
+# Google Gemini AI
+# Used for AI-powered stock analysis
+google-generativeai>=0.3.0

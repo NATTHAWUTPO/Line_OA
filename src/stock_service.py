@@ -102,3 +102,41 @@ def get_multiple_prices(symbols: list) -> Dict[str, Optional[float]]:
     for symbol in symbols:
         results[symbol] = get_current_price(symbol)
     return results
+
+
+def get_price_history(symbol: str, days: int = 30) -> list:
+    """
+    ดึงข้อมูลราคาย้อนหลังสำหรับ AI วิเคราะห์
+    
+    Args:
+        symbol (str): ชื่อหุ้น
+        days (int): จำนวนวันย้อนหลัง (default: 30)
+    
+    Returns:
+        list: รายการราคาย้อนหลัง
+            [{"date": "2024-01-01", "open": 180, "high": 182, "low": 179, "close": 181, "volume": 1000000}, ...]
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        data = ticker.history(period=f"{days}d")
+        
+        if data.empty:
+            return []
+        
+        history = []
+        for date, row in data.iterrows():
+            history.append({
+                "date": date.strftime("%Y-%m-%d"),
+                "open": round(float(row['Open']), 2),
+                "high": round(float(row['High']), 2),
+                "low": round(float(row['Low']), 2),
+                "close": round(float(row['Close']), 2),
+                "volume": int(row['Volume'])
+            })
+        
+        return history
+    
+    except Exception as e:
+        print(f"❌ Error fetching history for {symbol}: {e}")
+        return []
+
