@@ -73,6 +73,42 @@ def home():
     return {"status": "ok", "message": "Stock Monitor Bot is running! 🚀"}
 
 
+@app.route("/test-ai")
+def test_ai():
+    """ทดสอบว่า AI ทำงานไหม"""
+    import os
+    
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    
+    result = {
+        "gemini_key_exists": gemini_key is not None,
+        "gemini_key_length": len(gemini_key) if gemini_key else 0,
+        "gemini_key_preview": gemini_key[:10] + "..." if gemini_key and len(gemini_key) > 10 else "NOT SET"
+    }
+    
+    # Try to test AI
+    if gemini_key:
+        try:
+            from src.ai_service import analyze_stock_with_ai
+            analysis = analyze_stock_with_ai(
+                symbol="AAPL",
+                current_price=150.0,
+                price_history=[{"date": "2024-01-01", "close": 145.0}],
+                company_name="Apple Inc."
+            )
+            result["ai_test"] = "SUCCESS"
+            result["ai_result"] = analysis
+        except Exception as e:
+            result["ai_test"] = "FAILED"
+            result["ai_error"] = str(e)
+    else:
+        result["ai_test"] = "SKIPPED - No API Key"
+    
+    return result
+
+
+
+
 @app.route("/setup-richmenu")
 def setup_rich_menu():
     """
