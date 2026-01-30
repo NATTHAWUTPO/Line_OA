@@ -111,24 +111,59 @@ def analyze_stock_with_ai(
         # Record this request for rate limiting
         _record_request()
         
+        # === Calculate Technical Indicators for AI ===
+        closes = []
+        if price_history and len(price_history) >= 14:
+            closes = [p.get("close", p.get("price", current_price)) for p in price_history]
+        
+        # Calculate indicators (or use defaults)
+        if len(closes) >= 14:
+            rsi = _calculate_rsi(closes, 14)
+            sma_10 = sum(closes[-10:]) / 10 if len(closes) >= 10 else current_price
+            sma_20 = sum(closes[-20:]) / 20 if len(closes) >= 20 else current_price
+            bb_upper, bb_middle, bb_lower = _calculate_bollinger_bands(closes, 20, 2)
+            macd_line, signal_line, macd_histogram = _calculate_macd(closes)
+            
+            # Determine trend signals
+            ma_trend = "BULLISH (Golden Cross)" if sma_10 > sma_20 else "BEARISH (Death Cross)"
+            rsi_signal = "OVERSOLD (BUY Signal)" if rsi < 30 else ("OVERBOUGHT (SELL Signal)" if rsi > 70 else "NEUTRAL")
+            bb_position = "NEAR LOWER (BUY Zone)" if current_price < bb_lower else ("NEAR UPPER (SELL Zone)" if current_price > bb_upper else "MIDDLE")
+            macd_signal = "BULLISH" if macd_histogram > 0 else "BEARISH"
+            
+            indicators_text = f"""
+=== TECHNICAL INDICATORS ===
+RSI (14): {rsi:.1f} - {rsi_signal}
+SMA 10: ${sma_10:.2f} | SMA 20: ${sma_20:.2f} - {ma_trend}
+Bollinger Bands: Upper ${bb_upper:.2f} | Middle ${bb_middle:.2f} | Lower ${bb_lower:.2f} - Price {bb_position}
+MACD: {macd_line:.2f} (Signal: {signal_line:.2f}) - {macd_signal}
+"""
+        else:
+            indicators_text = "\n=== TECHNICAL INDICATORS ===\nInsufficient data for full analysis\n"
+        
         # Use Groq API
         from groq import Groq
         client = Groq(api_key=groq_key)
         
-        # สร้าง prompt สำหรับวิเคราะห์
-        prompt = f"""You are a professional stock analyst. Analyze this stock and provide buy/sell recommendations.
+        # สร้าง prompt ที่รวม AI + Technical Indicators
+        prompt = f"""You are a professional stock analyst combining TECHNICAL ANALYSIS with MARKET SENTIMENT.
 
 Stock: {symbol} ({company_name})
 Current Price: ${current_price}
+{indicators_text}
+Historical prices (last 5 days):
+{json.dumps(price_history[-5:] if price_history else [], indent=2)}
 
-Historical prices (last 10 days):
-{json.dumps(price_history[-10:] if price_history else [], indent=2)}
+ANALYSIS GUIDELINES:
+1. Use the technical indicators above to determine trend direction
+2. RSI < 30 = oversold (good to buy), RSI > 70 = overbought (consider selling)
+3. Price near Lower Bollinger = potential buy, near Upper = potential sell
+4. MACD Bullish = uptrend, Bearish = downtrend
+5. Combine indicators to form a consensus recommendation
 
-IMPORTANT: Respond ONLY with valid JSON (no markdown, no explanation outside JSON).
-Calculate actual price values based on the current price ${current_price}.
+IMPORTANT: Respond ONLY with valid JSON. Use the technical data to calculate realistic entry/TP/SL prices.
 
-Example response format:
-{{"recommendation": "BUY", "entry_price": {current_price * 0.98:.2f}, "take_profit": {current_price * 1.10:.2f}, "stop_loss": {current_price * 0.93:.2f}, "analysis": "คำอธิบายสั้นๆ ภาษาไทย", "confidence": 65}}
+Example format:
+{{"recommendation": "BUY", "entry_price": {bb_middle * 0.99 if len(closes) >= 14 else current_price * 0.98:.2f}, "take_profit": {bb_upper * 0.98 if len(closes) >= 14 else current_price * 1.10:.2f}, "stop_loss": {bb_lower * 0.98 if len(closes) >= 14 else current_price * 0.93:.2f}, "analysis": "คำอธิบายสั้นๆ รวม sentiment + indicators ภาษาไทย", "confidence": 75}}
 
 Provide your analysis as JSON:"""
 
