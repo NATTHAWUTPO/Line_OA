@@ -116,16 +116,21 @@ def analyze_stock_with_ai(
         client = Groq(api_key=groq_key)
         
         # สร้าง prompt สำหรับวิเคราะห์
-        prompt = f"""คุณเป็นนักวิเคราะห์หุ้นมืออาชีพ วิเคราะห์หุ้นนี้และแนะนำจุดซื้อ/ขาย:
+        prompt = f"""You are a professional stock analyst. Analyze this stock and provide buy/sell recommendations.
 
-หุ้น: {symbol} ({company_name})
-ราคาปัจจุบัน: ${current_price}
+Stock: {symbol} ({company_name})
+Current Price: ${current_price}
 
-ข้อมูลราคาย้อนหลัง:
+Historical prices (last 10 days):
 {json.dumps(price_history[-10:] if price_history else [], indent=2)}
 
-ตอบเป็น JSON format เท่านั้น (ไม่มี markdown):
-{{"recommendation": "BUY" หรือ "SELL" หรือ "HOLD", "entry_price": ราคาเข้าซื้อ, "take_profit": ราคาขายทำกำไร, "stop_loss": ราคาตัดขาดทุน, "analysis": "คำอธิบายสั้นๆ ภาษาไทย", "confidence": 0-100}}"""
+IMPORTANT: Respond ONLY with valid JSON (no markdown, no explanation outside JSON).
+Calculate actual price values based on the current price ${current_price}.
+
+Example response format:
+{{"recommendation": "BUY", "entry_price": {current_price * 0.98:.2f}, "take_profit": {current_price * 1.10:.2f}, "stop_loss": {current_price * 0.93:.2f}, "analysis": "คำอธิบายสั้นๆ ภาษาไทย", "confidence": 65}}
+
+Provide your analysis as JSON:"""
 
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
