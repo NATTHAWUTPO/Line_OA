@@ -75,8 +75,9 @@ def home():
 
 @app.route("/test-ai")
 def test_ai():
-    """ทดสอบว่า AI ทำงานไหม"""
+    """ทดสอบว่า AI ทำงานไหม - พร้อม debug ละเอียด"""
     import os
+    import google.generativeai as genai
     
     gemini_key = os.getenv("GEMINI_API_KEY")
     
@@ -86,7 +87,23 @@ def test_ai():
         "gemini_key_preview": gemini_key[:10] + "..." if gemini_key and len(gemini_key) > 10 else "NOT SET"
     }
     
-    # Try to test AI
+    # Test Gemini directly (not through ai_service)
+    if gemini_key:
+        try:
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            # Simple test prompt
+            response = model.generate_content("Say 'Hello AI is working!' in JSON format: {\"message\": \"...\"}")
+            result["gemini_raw_response"] = response.text[:200]  # First 200 chars
+            result["gemini_direct_test"] = "SUCCESS"
+            
+        except Exception as e:
+            result["gemini_direct_test"] = "FAILED"
+            result["gemini_error"] = str(e)
+            result["gemini_error_type"] = type(e).__name__
+    
+    # Also test through ai_service
     if gemini_key:
         try:
             from src.ai_service import analyze_stock_with_ai
@@ -96,13 +113,11 @@ def test_ai():
                 price_history=[{"date": "2024-01-01", "close": 145.0}],
                 company_name="Apple Inc."
             )
-            result["ai_test"] = "SUCCESS"
+            result["ai_service_test"] = "SUCCESS"
             result["ai_result"] = analysis
         except Exception as e:
-            result["ai_test"] = "FAILED"
-            result["ai_error"] = str(e)
-    else:
-        result["ai_test"] = "SKIPPED - No API Key"
+            result["ai_service_test"] = "FAILED"
+            result["ai_service_error"] = str(e)
     
     return result
 
