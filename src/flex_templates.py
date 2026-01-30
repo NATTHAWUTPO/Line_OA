@@ -441,3 +441,224 @@ def create_watchlist_flex(watchlist: List[Dict[str, Any]]) -> Dict[str, Any]:
             "paddingAll": "10px"
         }
     }
+
+
+def create_alerts_flex(alerts: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    สร้าง Flex Message แสดงรายการ Alerts
+    """
+    if not alerts:
+        return {
+            "type": "bubble",
+            "size": "mega",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "🔔 ยังไม่มีการแจ้งเตือน",
+                        "size": "lg",
+                        "weight": "bold",
+                        "align": "center"
+                    },
+                    {
+                        "type": "text",
+                        "text": "พิมพ์ชื่อหุ้น เช่น AAPL\nแล้วกด 'ตั้งแจ้งเตือน'",
+                        "size": "sm",
+                        "color": "#666666",
+                        "align": "center",
+                        "margin": "lg",
+                        "wrap": True
+                    }
+                ],
+                "paddingAll": "30px"
+            }
+        }
+    
+    # Create list of alerts
+    alert_items = []
+    for item in alerts[:10]:  # Max 10 items
+        symbol = item.get("symbol", "N/A")
+        entry = item.get("entry_price", 0)
+        tp = item.get("take_profit", 0)
+        sl = item.get("stop_loss", 0)
+        
+        alert_items.append({
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": f"📊 {symbol}",
+                            "size": "md",
+                            "weight": "bold",
+                            "flex": 3
+                        },
+                        {
+                            "type": "text",
+                            "text": "🗑️ ลบ",
+                            "size": "xs",
+                            "color": "#FF5551",
+                            "flex": 1,
+                            "align": "end",
+                            "action": {
+                                "type": "postback",
+                                "data": f"action=delete_alert&symbol={symbol}"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "text",
+                    "text": f"Entry: ${entry:,.2f} | TP: ${tp:,.2f} | SL: ${sl:,.2f}",
+                    "size": "xs",
+                    "color": "#666666",
+                    "margin": "sm"
+                }
+            ],
+            "margin": "lg",
+            "paddingAll": "10px",
+            "backgroundColor": "#f5f5f5",
+            "cornerRadius": "8px"
+        })
+    
+    return {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": f"🔔 การแจ้งเตือน ({len(alerts)} รายการ)",
+                    "color": "#ffffff",
+                    "size": "lg",
+                    "weight": "bold"
+                }
+            ],
+            "backgroundColor": "#FF6B6B",
+            "paddingAll": "20px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "กด 🗑️ เพื่อลบการแจ้งเตือน",
+                    "size": "xs",
+                    "color": "#999999"
+                },
+                {"type": "separator", "margin": "md"},
+                *alert_items
+            ],
+            "paddingAll": "20px"
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "💡 ระบบจะแจ้งเตือนเมื่อราคาถึงเป้า",
+                    "size": "xs",
+                    "color": "#999999",
+                    "align": "center"
+                }
+            ],
+            "paddingAll": "10px"
+        }
+    }
+
+
+def create_menu_flex() -> Dict[str, Any]:
+    """
+    สร้าง Menu Card สำหรับให้กดเลือกคำสั่ง
+    """
+    return {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "📱 เมนูหลัก",
+                    "color": "#ffffff",
+                    "size": "lg",
+                    "weight": "bold"
+                }
+            ],
+            "backgroundColor": "#27ACB2",
+            "paddingAll": "20px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "message",
+                        "label": "🔍 ค้นหาหุ้น",
+                        "text": "HELP"
+                    },
+                    "style": "primary",
+                    "color": "#27ACB2"
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "message",
+                        "label": "⭐ Watchlist",
+                        "text": "WATCHLIST"
+                    },
+                    "style": "secondary",
+                    "margin": "md"
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "message",
+                        "label": "🔔 การแจ้งเตือน",
+                        "text": "ALERTS"
+                    },
+                    "style": "secondary",
+                    "margin": "md"
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "message",
+                        "label": "❓ วิธีใช้งาน",
+                        "text": "HELP"
+                    },
+                    "style": "secondary",
+                    "margin": "md"
+                }
+            ],
+            "paddingAll": "20px"
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "พิมพ์ MENU เพื่อเปิดเมนูนี้",
+                    "size": "xs",
+                    "color": "#999999",
+                    "align": "center"
+                }
+            ],
+            "paddingAll": "10px"
+        }
+    }
+

@@ -48,7 +48,9 @@ from src.flex_templates import (
     create_ai_analysis_flex,
     create_watchlist_flex,
     create_welcome_flex,
-    create_help_flex
+    create_help_flex,
+    create_alerts_flex,
+    create_menu_flex
 )
 
 # Initialize Flask
@@ -147,6 +149,37 @@ def handle_text_message(event):
                         FlexMessage(
                             alt_text="Watchlist ของคุณ",
                             contents=FlexContainer.from_dict(watchlist_flex)
+                        )
+                    ]
+                )
+            )
+            return
+        
+        if text in ["ALERTS", "แจ้งเตือน", "การแจ้งเตือน"]:
+            alerts = get_user_alerts(user_id)
+            alerts_flex = create_alerts_flex(alerts)
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        FlexMessage(
+                            alt_text="การแจ้งเตือนของคุณ",
+                            contents=FlexContainer.from_dict(alerts_flex)
+                        )
+                    ]
+                )
+            )
+            return
+        
+        if text in ["MENU", "เมนู"]:
+            menu_flex = create_menu_flex()
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        FlexMessage(
+                            alt_text="เมนูหลัก",
+                            contents=FlexContainer.from_dict(menu_flex)
                         )
                     ]
                 )
@@ -288,6 +321,20 @@ def handle_postback(event):
                     reply_token=event.reply_token,
                     messages=[
                         TextMessage(text=f"🗑️ ลบ {symbol} ออกจาก Watchlist แล้ว")
+                    ]
+                )
+            )
+        
+        elif action == "delete_alert":
+            symbol = params.get("symbol")
+            from src.firebase_service import mark_alert_triggered
+            mark_alert_triggered(user_id, symbol)
+            
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        TextMessage(text=f"🗑️ ลบการแจ้งเตือน {symbol} แล้ว")
                     ]
                 )
             )
