@@ -8,12 +8,56 @@ Features:
 - แนะนำ Entry Point (จุดเข้าซื้อ)
 - แนะนำ Take Profit (จุดขายทำกำไร)
 - แนะนำ Stop Loss (จุดตัดขาดทุน)
+- Rate limiting และ Caching ป้องกัน quota หมด
 """
 
 import os
 import json
+import time
 import google.generativeai as genai
 from typing import Optional, Dict, Any
+
+
+# ===== RATE LIMITING & CACHING =====
+# Cache: เก็บผลวิเคราะห์ไว้ 5 นาที ไม่ต้องเรียก API ซ้ำ
+_analysis_cache: Dict[str, Dict] = {}
+CACHE_TTL_SECONDS = 300  # 5 นาที
+
+# Rate limit: จำกัด 10 requests ต่อนาที
+_request_times: list = []
+MAX_REQUESTS_PER_MINUTE = 10
+
+
+def _is_rate_limited() -> bool:
+    """เช็คว่าเกิน rate limit หรือยัง"""
+    global _request_times
+    now = time.time()
+    # ลบ request เก่ากว่า 1 นาที
+    _request_times = [t for t in _request_times if now - t < 60]
+    return len(_request_times) >= MAX_REQUESTS_PER_MINUTE
+
+
+def _record_request():
+    """บันทึกเวลา request"""
+    _request_times.append(time.time())
+
+
+def _get_cached_analysis(symbol: str) -> Optional[Dict]:
+    """ดึงผลวิเคราะห์จาก cache ถ้ายังไม่หมดอายุ"""
+    if symbol in _analysis_cache:
+        cached = _analysis_cache[symbol]
+        if time.time() - cached["timestamp"] < CACHE_TTL_SECONDS:
+            print(f"📦 Using cached analysis for {symbol}")
+            return cached["data"]
+    return None
+
+
+def _cache_analysis(symbol: str, data: Dict):
+    """เก็บผลวิเคราะห์ลง cache"""
+    _analysis_cache[symbol] = {
+        "timestamp": time.time(),
+        "data": data
+    }
 
 
 def analyze_stock_with_ai(
@@ -41,7 +85,17 @@ def analyze_stock_with_ai(
             "confidence": float        # ความมั่นใจ 0-100
         }
     """
-    # Get API key fresh every time
+    # Check cache first
+    cached = _get_cached_analysis(symbol)
+    if cached:
+        return cached
+    
+    # Check rate limit
+    if _is_rate_limited():
+        print(f"⚠️ Rate limited! Using default analysis for {symbol}")
+        return _default_analysis(current_price)
+    
+    # Get API key
     api_key = os.getenv("GEMINI_API_KEY")
     
     if not api_key:
@@ -49,6 +103,9 @@ def analyze_stock_with_ai(
         return _default_analysis(current_price)
     
     try:
+        # Record this request for rate limiting
+        _record_request()
+        
         # Configure genai with fresh key
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-2.0-flash')
@@ -88,7 +145,7 @@ def analyze_stock_with_ai(
         result = json.loads(result_text)
         
         # Validate และ clean data
-        return {
+        analysis_result = {
             "recommendation": result.get("recommendation", "HOLD"),
             "entry_price": float(result.get("entry_price", current_price)),
             "take_profit": float(result.get("take_profit", current_price * 1.10)),
@@ -96,6 +153,11 @@ def analyze_stock_with_ai(
             "analysis": result.get("analysis", "ไม่มีข้อมูลเพิ่มเติม"),
             "confidence": float(result.get("confidence", 50))
         }
+        
+        # Cache the result for future use
+        _cache_analysis(symbol, analysis_result)
+        
+        return analysis_result
     
     except json.JSONDecodeError as e:
         print(f"❌ AI response parsing error: {e}")
