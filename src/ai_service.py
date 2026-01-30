@@ -51,7 +51,7 @@ def analyze_stock_with_ai(
     try:
         # Configure genai with fresh key
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         # สร้าง prompt สำหรับวิเคราะห์
         prompt = f"""
