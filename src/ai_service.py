@@ -92,15 +92,15 @@ def analyze_stock_with_ai(
     
     # Check rate limit
     if _is_rate_limited():
-        print(f"⚠️ Rate limited! Using default analysis for {symbol}")
-        return _default_analysis(current_price)
+        print(f"⚠️ Rate limited! Using technical analysis for {symbol}")
+        return _default_analysis(current_price, price_history)
     
     # Get API key
     api_key = os.getenv("GEMINI_API_KEY")
     
     if not api_key:
-        print("⚠️ GEMINI_API_KEY not found, using default analysis")
-        return _default_analysis(current_price)
+        print("⚠️ GEMINI_API_KEY not found, using technical analysis")
+        return _default_analysis(current_price, price_history)
     
     try:
         # Record this request for rate limiting
@@ -161,26 +161,199 @@ def analyze_stock_with_ai(
     
     except json.JSONDecodeError as e:
         print(f"❌ AI response parsing error: {e}")
-        return _default_analysis(current_price)
+        return _default_analysis(current_price, price_history)
     
     except Exception as e:
         print(f"❌ AI analysis error for {symbol}: {e}")
-        return _default_analysis(current_price)
+        return _default_analysis(current_price, price_history)
 
 
-def _default_analysis(current_price: float) -> Dict[str, Any]:
+def _default_analysis(current_price: float, price_history: list = None) -> Dict[str, Any]:
     """
-    Default analysis เมื่อ AI ไม่พร้อมใช้งาน
-    ใช้ Simple Technical Analysis (STA)
+    Technical Analysis เมื่อ AI ไม่พร้อมใช้งาน
+    ใช้ RSI, Moving Average, Bollinger Bands, MACD
     """
+    # ถ้าไม่มี price history ให้ใช้สูตรเดิม
+    if not price_history or len(price_history) < 14:
+        return {
+            "recommendation": "HOLD",
+            "entry_price": round(current_price * 0.97, 2),
+            "take_profit": round(current_price * 1.10, 2),
+            "stop_loss": round(current_price * 0.93, 2),
+            "analysis": "ข้อมูลไม่เพียงพอสำหรับวิเคราะห์",
+            "confidence": 20
+        }
+    
+    # Extract close prices
+    closes = [p.get("close", p.get("price", current_price)) for p in price_history]
+    
+    # === Calculate Technical Indicators ===
+    
+    # 1. RSI (Relative Strength Index) - 14 periods
+    rsi = _calculate_rsi(closes, 14)
+    
+    # 2. Moving Averages
+    sma_10 = sum(closes[-10:]) / 10 if len(closes) >= 10 else current_price
+    sma_20 = sum(closes[-20:]) / 20 if len(closes) >= 20 else current_price
+    
+    # 3. Bollinger Bands (20 periods, 2 std dev)
+    bb_upper, bb_middle, bb_lower = _calculate_bollinger_bands(closes, 20, 2)
+    
+    # 4. MACD (12, 26, 9)
+    macd_line, signal_line, macd_histogram = _calculate_macd(closes)
+    
+    # === Analyze Signals ===
+    signals = []
+    buy_score = 0
+    sell_score = 0
+    
+    # RSI Analysis
+    if rsi < 30:
+        signals.append("RSI Oversold")
+        buy_score += 2
+    elif rsi > 70:
+        signals.append("RSI Overbought")
+        sell_score += 2
+    elif rsi < 50:
+        buy_score += 1
+    else:
+        sell_score += 1
+    
+    # Moving Average Crossover
+    if sma_10 > sma_20:
+        signals.append("MA Golden Cross")
+        buy_score += 1
+    else:
+        signals.append("MA Death Cross")
+        sell_score += 1
+    
+    # Bollinger Bands
+    if current_price < bb_lower:
+        signals.append("Price < BB Lower")
+        buy_score += 2
+    elif current_price > bb_upper:
+        signals.append("Price > BB Upper")
+        sell_score += 2
+    
+    # MACD
+    if macd_histogram > 0 and macd_line > signal_line:
+        signals.append("MACD Bullish")
+        buy_score += 1
+    elif macd_histogram < 0 and macd_line < signal_line:
+        signals.append("MACD Bearish")
+        sell_score += 1
+    
+    # === Determine Recommendation ===
+    total_score = buy_score - sell_score
+    
+    if total_score >= 3:
+        recommendation = "BUY"
+        confidence = min(70 + total_score * 5, 85)
+    elif total_score <= -3:
+        recommendation = "SELL"
+        confidence = min(70 + abs(total_score) * 5, 85)
+    else:
+        recommendation = "HOLD"
+        confidence = 50
+    
+    # === Calculate Entry/TP/SL based on analysis ===
+    volatility = (bb_upper - bb_lower) / bb_middle if bb_middle > 0 else 0.05
+    
+    if recommendation == "BUY":
+        entry_price = min(current_price, bb_lower * 1.01)  # Near lower band
+        take_profit = bb_upper * 0.98  # Near upper band
+        stop_loss = entry_price * (1 - volatility)  # Based on volatility
+    elif recommendation == "SELL":
+        entry_price = current_price  # Sell now
+        take_profit = bb_lower * 1.02
+        stop_loss = bb_upper * 1.02
+    else:
+        entry_price = bb_middle * 0.98
+        take_profit = bb_upper * 0.95
+        stop_loss = bb_lower * 0.98
+    
+    # Build analysis text
+    analysis_text = f"RSI:{rsi:.0f} | {', '.join(signals[:2])}"
+    
     return {
-        "recommendation": "HOLD",
-        "entry_price": round(current_price * 0.97, 2),    # ซื้อเมื่อลง 3%
-        "take_profit": round(current_price * 1.10, 2),    # ขายเมื่อขึ้น 10%
-        "stop_loss": round(current_price * 0.93, 2),      # ตัดขาดทุนที่ 7%
-        "analysis": "ใช้การวิเคราะห์เบื้องต้น (AI ไม่พร้อม)",
-        "confidence": 30
+        "recommendation": recommendation,
+        "entry_price": round(entry_price, 2),
+        "take_profit": round(take_profit, 2),
+        "stop_loss": round(stop_loss, 2),
+        "analysis": analysis_text,
+        "confidence": confidence
     }
+
+
+def _calculate_rsi(prices: list, period: int = 14) -> float:
+    """คำนวณ RSI (Relative Strength Index)"""
+    if len(prices) < period + 1:
+        return 50.0  # Neutral
+    
+    deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
+    gains = [d if d > 0 else 0 for d in deltas[-period:]]
+    losses = [-d if d < 0 else 0 for d in deltas[-period:]]
+    
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
+    
+    if avg_loss == 0:
+        return 100.0
+    
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
+def _calculate_bollinger_bands(prices: list, period: int = 20, std_dev: int = 2) -> tuple:
+    """คำนวณ Bollinger Bands"""
+    if len(prices) < period:
+        avg = sum(prices) / len(prices)
+        return avg * 1.05, avg, avg * 0.95
+    
+    recent = prices[-period:]
+    middle = sum(recent) / period
+    
+    # Calculate standard deviation
+    variance = sum((p - middle) ** 2 for p in recent) / period
+    std = variance ** 0.5
+    
+    upper = middle + (std * std_dev)
+    lower = middle - (std * std_dev)
+    
+    return upper, middle, lower
+
+
+def _calculate_macd(prices: list, fast: int = 12, slow: int = 26, signal: int = 9) -> tuple:
+    """คำนวณ MACD"""
+    if len(prices) < slow:
+        return 0, 0, 0
+    
+    # Calculate EMAs
+    ema_fast = _calculate_ema(prices, fast)
+    ema_slow = _calculate_ema(prices, slow)
+    
+    macd_line = ema_fast - ema_slow
+    
+    # Simplified signal line (would need historical MACD values for proper EMA)
+    signal_line = macd_line * 0.9  # Approximation
+    histogram = macd_line - signal_line
+    
+    return macd_line, signal_line, histogram
+
+
+def _calculate_ema(prices: list, period: int) -> float:
+    """คำนวณ Exponential Moving Average"""
+    if len(prices) < period:
+        return sum(prices) / len(prices)
+    
+    multiplier = 2 / (period + 1)
+    ema = sum(prices[:period]) / period  # Start with SMA
+    
+    for price in prices[period:]:
+        ema = (price - ema) * multiplier + ema
+    
+    return ema
 
 
 def format_ai_analysis_message(
