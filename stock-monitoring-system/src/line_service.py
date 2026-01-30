@@ -1,63 +1,69 @@
 """
 LINE Service Module - src/line_service.py
 ==========================================
-รับผิดชอบการส่งข้อความผ่าน LINE Notify API
-ทำหน้าที่เดียวคือ "ยิง API ไปหา LINE" (Single Responsibility Principle)
+รับผิดชอบการส่งข้อความผ่าน LINE Messaging API
+ใช้ Push Message API สำหรับส่งข้อความหาผู้ใช้โดยตรง
+
+API Reference: https://developers.line.biz/en/reference/messaging-api/#send-push-message
 """
 
 import requests
-from typing import Optional, Tuple
-from src.config import LINE_NOTIFY_URL
+from typing import Tuple
+from src.config import LINE_API_ENDPOINT
 
 
-def send_notification(message: str, token: str) -> Tuple[bool, int]:
+def send_push_message(user_id: str, message: str, token: str) -> Tuple[bool, int]:
     """
-    ส่งข้อความเข้า LINE Notify
+    ส่งข้อความผ่าน LINE Messaging API (Push Message)
     
     Args:
+        user_id (str): LINE User ID ของผู้รับ
         message (str): ข้อความที่ต้องการส่ง
-        token (str): LINE Notify Access Token
+        token (str): Channel Access Token
     
     Returns:
         tuple: (success: bool, status_code: int)
             - success: True ถ้าส่งสำเร็จ (status 200)
             - status_code: HTTP Status Code
-    
-    Example:
-        >>> success, status = send_notification("Hello!", "YOUR_TOKEN")
-        >>> print(success)  # True
     """
     headers = {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {token}'
     }
     
+    # LINE Messaging API Push Message format
     payload = {
-        'message': message
+        'to': user_id,
+        'messages': [
+            {
+                'type': 'text',
+                'text': message
+            }
+        ]
     }
     
     try:
         response = requests.post(
-            LINE_NOTIFY_URL,
+            LINE_API_ENDPOINT,
             headers=headers,
-            data=payload,
-            timeout=10  # Timeout 10 วินาที
+            json=payload,
+            timeout=10
         )
         
         success = response.status_code == 200
         
         if not success:
-            print(f"❌ LINE Notify Error: Status {response.status_code}")
+            print(f"❌ LINE API Error: Status {response.status_code}")
             print(f"   Response: {response.text}")
         
         return success, response.status_code
     
     except requests.exceptions.Timeout:
-        print("❌ LINE Notify Error: Request timeout")
+        print("❌ LINE API Error: Request timeout")
         return False, 408
     
     except requests.exceptions.RequestException as e:
-        print(f"❌ LINE Notify Error: {e}")
+        print(f"❌ LINE API Error: {e}")
         return False, 500
 
 
@@ -66,6 +72,7 @@ def send_price_alert(
     name: str,
     current_price: float,
     target_price: float,
+    user_id: str,
     token: str
 ) -> Tuple[bool, int]:
     """
@@ -76,7 +83,8 @@ def send_price_alert(
         name: ชื่อเต็มหุ้น (e.g., "Apple Inc.")
         current_price: ราคาปัจจุบัน
         target_price: ราคาเป้าหมาย
-        token: LINE Notify Token
+        user_id: LINE User ID
+        token: Channel Access Token
     
     Returns:
         tuple: (success: bool, status_code: int)
@@ -84,23 +92,22 @@ def send_price_alert(
     # คำนวณส่วนลด
     discount_percent = round(((target_price - current_price) / target_price) * 100, 1)
     
-    message = f"""
-🚨 แจ้งเตือนราคาหุ้น!
+    message = f"""🚨 แจ้งเตือนราคาหุ้น!
 
 📈 {symbol} - {name}
 💰 ราคาปัจจุบัน: ${current_price:,.2f}
 🎯 ราคาเป้าหมาย: ${target_price:,.2f}
 📉 ต่ำกว่าเป้า: {discount_percent}%
 
-⏰ เวลาแจ้งเตือน: ตลาดเปิดอยู่
-💡 พิจารณาซื้อตามแผนที่วางไว้
-"""
+⏰ ตลาดเปิดอยู่
+💡 พิจารณาซื้อตามแผนที่วางไว้"""
     
-    return send_notification(message, token)
+    return send_push_message(user_id, message, token)
 
 
 def send_summary_report(
     stocks_data: list,
+    user_id: str,
     token: str
 ) -> Tuple[bool, int]:
     """
@@ -108,14 +115,13 @@ def send_summary_report(
     
     Args:
         stocks_data: รายการข้อมูลหุ้น
-            [{"symbol": "AAPL", "price": 178.45, "target": 170.00, "status": "watching"}, ...]
-        token: LINE Notify Token
+        user_id: LINE User ID
+        token: Channel Access Token
     
     Returns:
         tuple: (success: bool, status_code: int)
     """
-    # สร้างตารางสรุป
-    lines = ["📊 สรุปราคาหุ้น", "=" * 20]
+    lines = ["📊 สรุปราคาหุ้น", "─" * 18]
     
     for stock in stocks_data:
         symbol = stock.get("symbol", "N/A")
@@ -126,16 +132,16 @@ def send_summary_report(
             status_icon = "⚪"
             price_str = "N/A"
         elif price <= target:
-            status_icon = "🟢"  # ถึงเป้า - ซื้อได้
+            status_icon = "🟢"
             price_str = f"${price:,.2f}"
         else:
-            status_icon = "🔴"  # ยังไม่ถึงเป้า
+            status_icon = "🔴"
             price_str = f"${price:,.2f}"
         
-        lines.append(f"{status_icon} {symbol}: {price_str} (เป้า: ${target:,.2f})")
+        lines.append(f"{status_icon} {symbol}: {price_str}")
     
-    lines.append("=" * 20)
-    lines.append("🟢 = ถึงเป้า | 🔴 = ยังไม่ถึง")
+    lines.append("─" * 18)
+    lines.append("🟢 ถึงเป้า | 🔴 ยังไม่ถึง")
     
     message = "\n".join(lines)
-    return send_notification(message, token)
+    return send_push_message(user_id, message, token)

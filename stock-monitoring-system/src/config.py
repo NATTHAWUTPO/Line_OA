@@ -8,14 +8,20 @@ Configuration Module - src/config.py
 import os
 
 # ============================================
-# LINE Notify Configuration
+# LINE Messaging API Configuration
 # ============================================
 # ดึง Token จาก Environment Variable (Secure way)
 # ไม่ Hardcode Token ในโค้ดเพื่อความปลอดภัย
-LINE_TOKEN = os.getenv("LINE_TOKEN")
 
-# LINE Notify API Endpoint
-LINE_NOTIFY_URL = "https://notify-api.line.me/api/notify"
+# Channel Access Token จาก LINE Developers Console
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+
+# User ID ที่จะส่งข้อความหา (ดูได้จาก LINE Developers Console > Your user ID)
+# หรือ User ID ของคนที่ Add เป็นเพื่อนกับ LINE OA
+LINE_USER_ID = os.getenv("LINE_USER_ID")
+
+# LINE Messaging API Endpoint
+LINE_API_ENDPOINT = "https://api.line.me/v2/bot/message/push"
 
 
 # ============================================

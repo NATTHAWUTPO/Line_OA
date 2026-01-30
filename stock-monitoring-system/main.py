@@ -8,7 +8,7 @@ Workflow:
 1. ตรวจสอบ Configuration
 2. ดึงราคาหุ้นทุกตัวจาก Yahoo Finance
 3. เปรียบเทียบกับราคาเป้าหมาย
-4. ส่งแจ้งเตือนผ่าน LINE Notify (ถ้าราคาถึงเป้า)
+4. ส่งแจ้งเตือนผ่าน LINE Messaging API (ถ้าราคาถึงเป้า)
 5. ส่งสรุปราคาทุกตัว (Optional)
 
 Serverless Design:
@@ -17,8 +17,14 @@ Serverless Design:
 - Idempotent: รันกี่ครั้งก็ได้ผลลัพธ์เหมือนกัน (ณ เวลาเดียวกัน)
 """
 
-from src.config import TARGETS, LINE_TOKEN, SEND_SUMMARY_REPORT, SEND_PRICE_ALERT
-from src.stock_service import get_current_price, get_stock_info
+from src.config import (
+    TARGETS, 
+    LINE_CHANNEL_ACCESS_TOKEN, 
+    LINE_USER_ID,
+    SEND_SUMMARY_REPORT, 
+    SEND_PRICE_ALERT
+)
+from src.stock_service import get_current_price
 from src.line_service import send_price_alert, send_summary_report
 from datetime import datetime
 
@@ -35,9 +41,14 @@ def main():
     # ============================================
     # Step 1: Validate Configuration
     # ============================================
-    if not LINE_TOKEN:
-        print("❌ Error: LINE_TOKEN not found in environment variables!")
-        print("   Please set LINE_TOKEN in GitHub Secrets or .env file")
+    if not LINE_CHANNEL_ACCESS_TOKEN:
+        print("❌ Error: LINE_CHANNEL_ACCESS_TOKEN not found!")
+        print("   Please set LINE_CHANNEL_ACCESS_TOKEN in GitHub Secrets")
+        return
+    
+    if not LINE_USER_ID:
+        print("❌ Error: LINE_USER_ID not found!")
+        print("   Please set LINE_USER_ID in GitHub Secrets")
         return
     
     if not TARGETS:
@@ -50,7 +61,7 @@ def main():
     # ============================================
     # Step 2: Fetch & Process Stock Prices
     # ============================================
-    summary_data = []  # สำหรับ Summary Report
+    summary_data = []
     alerts_sent = 0
     
     for item in TARGETS:
@@ -92,7 +103,8 @@ def main():
                 name=name,
                 current_price=current_price,
                 target_price=target_price,
-                token=LINE_TOKEN
+                user_id=LINE_USER_ID,
+                token=LINE_CHANNEL_ACCESS_TOKEN
             )
             
             if success:
@@ -111,7 +123,8 @@ def main():
         
         success, status_code = send_summary_report(
             stocks_data=summary_data,
-            token=LINE_TOKEN
+            user_id=LINE_USER_ID,
+            token=LINE_CHANNEL_ACCESS_TOKEN
         )
         
         if success:
