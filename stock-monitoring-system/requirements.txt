@@ -1,0 +1,16 @@
+# Stock Monitoring System - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Yahoo Finance API wrapper
+# Used for fetching real-time stock prices
+yfinance>=0.2.36
+
+# HTTP requests library
+# Used for LINE Notify API calls
+requests>=2.31.0
+
+# Data manipulation (dependency of yfinance)
+pandas>=2.0.0
+
+# Numerical operations (dependency of yfinance)
+numpy>=1.24.0
