@@ -16,13 +16,6 @@ import google.generativeai as genai
 from typing import Optional, Dict, Any
 
 
-# Initialize Gemini
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-
-
 def analyze_stock_with_ai(
     symbol: str,
     current_price: float,
@@ -48,11 +41,16 @@ def analyze_stock_with_ai(
             "confidence": float        # ความมั่นใจ 0-100
         }
     """
-    if not GEMINI_API_KEY:
+    # Get API key fresh every time
+    api_key = os.getenv("GEMINI_API_KEY")
+    
+    if not api_key:
         print("⚠️ GEMINI_API_KEY not found, using default analysis")
         return _default_analysis(current_price)
     
     try:
+        # Configure genai with fresh key
+        genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         # สร้าง prompt สำหรับวิเคราะห์
