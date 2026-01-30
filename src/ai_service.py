@@ -17,7 +17,7 @@ from typing import Optional, Dict, Any
 
 
 # Initialize Gemini
-GEMINI_API_KEY = os.getenv("AIzaSyAs8TT5_s1JPHaYfOpI1lnck-wpzRJDK2I")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
