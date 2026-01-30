@@ -64,7 +64,8 @@ TARGETS = [
 # ตั้งค่าเกี่ยวกับการแจ้งเตือน
 
 # เปิด/ปิดการส่ง Summary Report ทุกครั้งที่รัน
-SEND_SUMMARY_REPORT = True
+# ⚠️ ปิดไว้เพื่อประหยัด Quota (LINE Messaging API ฟรี 200 ข้อความ/เดือน)
+SEND_SUMMARY_REPORT = False
 
 # เปิด/ปิดการแจ้งเตือนเมื่อราคาถึงเป้า
 SEND_PRICE_ALERT = True
