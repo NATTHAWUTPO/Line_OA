@@ -73,6 +73,114 @@ def home():
     return {"status": "ok", "message": "Stock Monitor Bot is running! 🚀"}
 
 
+@app.route("/setup-richmenu")
+def setup_rich_menu():
+    """
+    สร้าง Rich Menu อัตโนมัติ - เรียก URL นี้ครั้งเดียวเพื่อติดตั้งเมนู
+    """
+    import requests
+    
+    if not LINE_CHANNEL_ACCESS_TOKEN:
+        return {"error": "LINE_CHANNEL_ACCESS_TOKEN not set"}, 400
+    
+    headers = {
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    # Step 1: Create Rich Menu
+    rich_menu_data = {
+        "size": {"width": 2500, "height": 843},
+        "selected": True,
+        "name": "Stock Monitor Menu",
+        "chatBarText": "📊 เมนู",
+        "areas": [
+            {
+                "bounds": {"x": 0, "y": 0, "width": 625, "height": 843},
+                "action": {"type": "message", "text": "MENU"}
+            },
+            {
+                "bounds": {"x": 625, "y": 0, "width": 625, "height": 843},
+                "action": {"type": "message", "text": "WATCHLIST"}
+            },
+            {
+                "bounds": {"x": 1250, "y": 0, "width": 625, "height": 843},
+                "action": {"type": "message", "text": "ALERTS"}
+            },
+            {
+                "bounds": {"x": 1875, "y": 0, "width": 625, "height": 843},
+                "action": {"type": "message", "text": "HELP"}
+            }
+        ]
+    }
+    
+    # Create rich menu
+    create_resp = requests.post(
+        "https://api.line.me/v2/bot/richmenu",
+        headers=headers,
+        json=rich_menu_data
+    )
+    
+    if create_resp.status_code != 200:
+        return {"error": "Failed to create rich menu", "details": create_resp.text}, 400
+    
+    rich_menu_id = create_resp.json().get("richMenuId")
+    
+    # Step 2: Upload Rich Menu Image (simple colored boxes)
+    # Using a placeholder - ideally upload a real image
+    # For now, we'll use text-based menu which doesn't need image
+    
+    # Step 3: Set as default rich menu for all users
+    default_resp = requests.post(
+        f"https://api.line.me/v2/bot/user/all/richmenu/{rich_menu_id}",
+        headers=headers
+    )
+    
+    if default_resp.status_code != 200:
+        return {"error": "Failed to set default rich menu", "details": default_resp.text}, 400
+    
+    return {
+        "status": "success",
+        "message": "Rich Menu created and set as default!",
+        "rich_menu_id": rich_menu_id,
+        "note": "Please upload menu image via LINE Official Account Manager"
+    }
+
+
+@app.route("/delete-richmenu")
+def delete_rich_menu():
+    """ลบ Rich Menu ทั้งหมด"""
+    import requests
+    
+    headers = {
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
+    }
+    
+    # Get all rich menus
+    list_resp = requests.get(
+        "https://api.line.me/v2/bot/richmenu/list",
+        headers=headers
+    )
+    
+    if list_resp.status_code != 200:
+        return {"error": "Failed to list rich menus"}, 400
+    
+    rich_menus = list_resp.json().get("richmenus", [])
+    deleted = []
+    
+    for menu in rich_menus:
+        menu_id = menu.get("richMenuId")
+        requests.delete(
+            f"https://api.line.me/v2/bot/richmenu/{menu_id}",
+            headers=headers
+        )
+        deleted.append(menu_id)
+    
+    return {"status": "success", "deleted": deleted}
+
+
+
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """LINE Webhook endpoint - รับ events จาก LINE"""
