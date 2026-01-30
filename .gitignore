@@ -74,3 +74,11 @@ debug/
 htmlcov/
 .coverage
 coverage.xml
+
+# ==================================
+# Firebase Credentials (IMPORTANT!)
+# ==================================
+*-firebase-adminsdk-*.json
+firebase-credentials.json
+serviceAccountKey.json
+
