@@ -95,46 +95,46 @@ def analyze_stock_with_ai(
         print(f"⚠️ Rate limited! Using technical analysis for {symbol}")
         return _default_analysis(current_price, price_history)
     
-    # Get API key
-    api_key = os.getenv("GEMINI_API_KEY")
+    # Get API keys - try Groq first, then Gemini
+    groq_key = os.getenv("GROQ_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY")
     
-    if not api_key:
-        print("⚠️ GEMINI_API_KEY not found, using technical analysis")
+    if not groq_key and not gemini_key:
+        print("⚠️ No AI API key found, using technical analysis")
         return _default_analysis(current_price, price_history)
+    
+    # Use Gemini if no Groq key
+    if not groq_key and gemini_key:
+        return _analyze_with_gemini(symbol, current_price, price_history, company_name, gemini_key)
     
     try:
         # Record this request for rate limiting
         _record_request()
         
-        # Configure genai with fresh key
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        # Use Groq API
+        from groq import Groq
+        client = Groq(api_key=groq_key)
         
         # สร้าง prompt สำหรับวิเคราะห์
-        prompt = f"""
-คุณเป็นนักวิเคราะห์หุ้นมืออาชีพ วิเคราะห์หุ้นนี้และแนะนำจุดซื้อ/ขาย:
+        prompt = f"""คุณเป็นนักวิเคราะห์หุ้นมืออาชีพ วิเคราะห์หุ้นนี้และแนะนำจุดซื้อ/ขาย:
 
 หุ้น: {symbol} ({company_name})
 ราคาปัจจุบัน: ${current_price}
 
-ข้อมูลราคาย้อนหลัง 30 วัน:
-{json.dumps(price_history[-10:], indent=2)}
+ข้อมูลราคาย้อนหลัง:
+{json.dumps(price_history[-10:] if price_history else [], indent=2)}
 
-กรุณาวิเคราะห์และตอบเป็น JSON format เท่านั้น:
-{{
-    "recommendation": "BUY" หรือ "SELL" หรือ "HOLD",
-    "entry_price": ราคาที่แนะนำเข้าซื้อ (ถ้า recommendation เป็น BUY),
-    "take_profit": ราคาขายทำกำไร (สูงกว่า entry 5-15%),
-    "stop_loss": ราคาตัดขาดทุน (ต่ำกว่า entry 3-7%),
-    "analysis": "คำอธิบายสั้นๆ ภาษาไทย ไม่เกิน 2 บรรทัด",
-    "confidence": ความมั่นใจ 0-100
-}}
+ตอบเป็น JSON format เท่านั้น (ไม่มี markdown):
+{{"recommendation": "BUY" หรือ "SELL" หรือ "HOLD", "entry_price": ราคาเข้าซื้อ, "take_profit": ราคาขายทำกำไร, "stop_loss": ราคาตัดขาดทุน, "analysis": "คำอธิบายสั้นๆ ภาษาไทย", "confidence": 0-100}}"""
 
-ตอบเป็น JSON เท่านั้น ไม่ต้องมี markdown code block
-"""
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=500
+        )
         
-        response = model.generate_content(prompt)
-        result_text = response.text.strip()
+        result_text = response.choices[0].message.content.strip()
         
         # ลบ markdown code block ถ้ามี
         if result_text.startswith("```"):
@@ -165,6 +165,44 @@ def analyze_stock_with_ai(
     
     except Exception as e:
         print(f"❌ AI analysis error for {symbol}: {e}")
+        return _default_analysis(current_price, price_history)
+
+
+def _analyze_with_gemini(symbol: str, current_price: float, price_history: list, company_name: str, api_key: str) -> Dict[str, Any]:
+    """Gemini AI fallback when Groq is not available"""
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        prompt = f"""คุณเป็นนักวิเคราะห์หุ้นมืออาชีพ วิเคราะห์หุ้นนี้:
+
+หุ้น: {symbol} ({company_name})
+ราคาปัจจุบัน: ${current_price}
+ข้อมูลราคาย้อนหลัง: {json.dumps(price_history[-10:] if price_history else [], indent=2)}
+
+ตอบเป็น JSON (ไม่มี markdown):
+{{"recommendation": "BUY/SELL/HOLD", "entry_price": number, "take_profit": number, "stop_loss": number, "analysis": "คำอธิบายภาษาไทย", "confidence": 0-100}}"""
+
+        response = model.generate_content(prompt)
+        result_text = response.text.strip()
+        
+        if result_text.startswith("```"):
+            result_text = result_text.split("```")[1]
+            if result_text.startswith("json"):
+                result_text = result_text[4:]
+        
+        result = json.loads(result_text)
+        return {
+            "recommendation": result.get("recommendation", "HOLD"),
+            "entry_price": float(result.get("entry_price", current_price)),
+            "take_profit": float(result.get("take_profit", current_price * 1.10)),
+            "stop_loss": float(result.get("stop_loss", current_price * 0.95)),
+            "analysis": result.get("analysis", "ไม่มีข้อมูลเพิ่มเติม"),
+            "confidence": float(result.get("confidence", 50))
+        }
+    except Exception as e:
+        print(f"❌ Gemini fallback error: {e}")
         return _default_analysis(current_price, price_history)
 
 

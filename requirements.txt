@@ -18,8 +18,11 @@ requests>=2.31.0
 pandas>=2.0.0
 numpy>=1.24.0
 
-# Google Gemini AI
+# Google Gemini AI (backup)
 google-generativeai>=0.3.0
+
+# Groq AI (primary - faster, free tier generous)
+groq>=0.4.0
 
 # Firebase Admin SDK
 firebase-admin>=6.2.0
