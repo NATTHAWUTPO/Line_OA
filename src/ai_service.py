@@ -144,8 +144,13 @@ MACD: {macd_line:.2f} (Signal: {signal_line:.2f}) - {macd_signal}
         from groq import Groq
         client = Groq(api_key=groq_key)
         
-        # สร้าง prompt ที่รวม AI + Technical Indicators
-        prompt = f"""You are a professional stock analyst combining TECHNICAL ANALYSIS with MARKET SENTIMENT.
+        # สร้าง prompt ที่รวม AI + Technical Indicators (Long-only mode)
+        # Entry = จุดรอเข้าซื้อ (ต่ำกว่าราคาปัจจุบันเสมอ)
+        wait_entry = bb_lower * 1.02 if len(closes) >= 14 else current_price * 0.95
+        target_tp = bb_upper * 0.98 if len(closes) >= 14 else current_price * 1.12
+        target_sl = (bb_lower * 0.95) if len(closes) >= 14 else current_price * 0.90
+        
+        prompt = f"""You are a professional stock analyst for LONG-ONLY investors (buy and hold, no short selling).
 
 Stock: {symbol} ({company_name})
 Current Price: ${current_price}
@@ -153,19 +158,23 @@ Current Price: ${current_price}
 Historical prices (last 5 days):
 {json.dumps(price_history[-5:] if price_history else [], indent=2)}
 
-ANALYSIS GUIDELINES:
-1. Use the technical indicators above to determine trend direction
-2. RSI < 30 = oversold (good to buy), RSI > 70 = overbought (consider selling)
-3. Price near Lower Bollinger = potential buy, near Upper = potential sell
-4. MACD Bullish = uptrend, Bearish = downtrend
-5. Combine indicators to form a consensus recommendation
+ANALYSIS FOR LONG INVESTORS:
+1. Recommendation should be: BUY (good entry now), HOLD (wait for better price), or SELL (take profit if holding)
+2. entry_price = "จุดรอเข้า" - the price to WAIT for before buying (should be BELOW current price)
+3. take_profit = target selling price (ABOVE entry_price)
+4. stop_loss = cut loss price (BELOW entry_price)
 
-IMPORTANT: Respond ONLY with valid JSON. Use the technical data to calculate realistic entry/TP/SL prices.
+IMPORTANT RULES:
+- entry_price MUST be lower than current price (it's a waiting point)
+- take_profit MUST be higher than entry_price
+- stop_loss MUST be lower than entry_price
+- If BUY: entry_price can be close to current (within 3%)
+- If HOLD/SELL: entry_price should be the lower Bollinger Band area
 
-Example format:
-{{"recommendation": "BUY", "entry_price": {bb_middle * 0.99 if len(closes) >= 14 else current_price * 0.98:.2f}, "take_profit": {bb_upper * 0.98 if len(closes) >= 14 else current_price * 1.10:.2f}, "stop_loss": {bb_lower * 0.98 if len(closes) >= 14 else current_price * 0.93:.2f}, "analysis": "คำอธิบายสั้นๆ รวม sentiment + indicators ภาษาไทย", "confidence": 75}}
+Respond ONLY with valid JSON:
+{{"recommendation": "HOLD", "entry_price": {wait_entry:.2f}, "take_profit": {target_tp:.2f}, "stop_loss": {target_sl:.2f}, "analysis": "คำอธิบายสั้นๆ ภาษาไทย", "confidence": 70}}
 
-Provide your analysis as JSON:"""
+Provide your analysis:"""
 
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
