@@ -45,31 +45,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # ถ้าเปิด AI Analysis จะใช้ค่าจาก AI แทน target_price
 
 TARGETS = [
-    {
-        "symbol": "AMD",
-        "name": "Advanced Micro Devices",
-        "target_price": 120.00
-    },
-    {
-        "symbol": "TSLA",
-        "name": "Tesla Inc.",
-        "target_price": 180.00
-    },
-    {
-        "symbol": "NVDA",
-        "name": "NVIDIA Corporation",
-        "target_price": 450.00
-    },
-    {
-        "symbol": "AAPL",
-        "name": "Apple Inc.",
-        "target_price": 170.00
-    },
-    {
-        "symbol": "GOOGL",
-        "name": "Alphabet Inc.",
-        "target_price": 130.00
-    }
+    # ลบ TARGETS ทั้งหมดแล้ว - ใช้ Firebase alerts แทน
 ]
 
 
