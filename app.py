@@ -122,6 +122,93 @@ def test_ai():
     return result
 
 
+# ===== AUTO SETUP RICH MENU =====
+def auto_setup_rich_menu():
+    """สร้าง Rich Menu อัตโนมัติเมื่อ app เริ่มต้น"""
+    import requests
+    
+    if not LINE_CHANNEL_ACCESS_TOKEN:
+        print("⚠️ Cannot setup Rich Menu: LINE_CHANNEL_ACCESS_TOKEN not set")
+        return
+    
+    headers = {
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    # Check if rich menu already exists
+    list_resp = requests.get(
+        "https://api.line.me/v2/bot/richmenu/list",
+        headers=headers
+    )
+    
+    if list_resp.status_code == 200:
+        existing_menus = list_resp.json().get("richmenus", [])
+        if existing_menus:
+            print(f"📋 Rich Menu already exists ({len(existing_menus)} menus)")
+            return  # Already has menu, skip
+    
+    print("🔧 Creating Rich Menu automatically...")
+    
+    rich_menu_data = {
+        "size": {"width": 2500, "height": 843},
+        "selected": True,
+        "name": "Stock Monitor Menu",
+        "chatBarText": "📊 เมนู",
+        "areas": [
+            {
+                "bounds": {"x": 0, "y": 0, "width": 625, "height": 843},
+                "action": {"type": "message", "text": "MENU"}
+            },
+            {
+                "bounds": {"x": 625, "y": 0, "width": 625, "height": 843},
+                "action": {"type": "message", "text": "WATCHLIST"}
+            },
+            {
+                "bounds": {"x": 1250, "y": 0, "width": 625, "height": 843},
+                "action": {"type": "message", "text": "ALERTS"}
+            },
+            {
+                "bounds": {"x": 1875, "y": 0, "width": 625, "height": 843},
+                "action": {"type": "message", "text": "HELP"}
+            }
+        ]
+    }
+    
+    # Create rich menu
+    create_resp = requests.post(
+        "https://api.line.me/v2/bot/richmenu",
+        headers=headers,
+        json=rich_menu_data
+    )
+    
+    if create_resp.status_code != 200:
+        print(f"❌ Failed to create Rich Menu: {create_resp.text}")
+        return
+    
+    rich_menu_id = create_resp.json().get("richMenuId")
+    
+    # Set as default for all users
+    default_resp = requests.post(
+        f"https://api.line.me/v2/bot/user/all/richmenu/{rich_menu_id}",
+        headers=headers
+    )
+    
+    if default_resp.status_code == 200:
+        print(f"✅ Rich Menu created and set as default! ID: {rich_menu_id}")
+    else:
+        print(f"⚠️ Rich Menu created but failed to set as default: {default_resp.text}")
+
+
+# Run auto-setup on first request (lazy init)
+_rich_menu_initialized = False
+
+@app.before_request
+def before_request():
+    global _rich_menu_initialized
+    if not _rich_menu_initialized:
+        auto_setup_rich_menu()
+        _rich_menu_initialized = True
 
 
 @app.route("/setup-richmenu")
