@@ -73,6 +73,17 @@ def home():
     return {"status": "ok", "message": "Stock Monitor Bot is running! 🚀"}
 
 
+@app.route("/send-watchlist-summary")
+def trigger_watchlist_summary():
+    """ส่ง Watchlist Summary ให้ทุก user (manual trigger)"""
+    from main import send_watchlist_summary
+    try:
+        send_watchlist_summary()
+        return {"status": "success", "message": "Watchlist summary sent to all users!"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
 @app.route("/test-ai")
 def test_ai():
     """ทดสอบว่า AI ทำงานไหม - พร้อม debug ละเอียด"""

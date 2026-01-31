@@ -120,6 +120,41 @@ def get_watchlist(user_id: str) -> List[Dict[str, Any]]:
         return []
 
 
+def get_all_watchlists() -> List[Dict[str, Any]]:
+    """
+    ดึง Watchlist ของทุก User (สำหรับ daily summary)
+    Returns: [{"user_id": "xxx", "stocks": [{"symbol": "AAPL", ...}]}]
+    """
+    db = _get_db()
+    if not db:
+        return []
+    
+    try:
+        all_watchlists = []
+        users_ref = db.collection("users").stream()
+        
+        for user_doc in users_ref:
+            user_id = user_doc.id
+            watchlist_docs = db.collection("users").document(user_id).collection("watchlist").stream()
+            
+            stocks = []
+            for watch_doc in watchlist_docs:
+                data = watch_doc.to_dict()
+                data["symbol"] = watch_doc.id
+                stocks.append(data)
+            
+            if stocks:  # Only include users with watchlist items
+                all_watchlists.append({
+                    "user_id": user_id,
+                    "stocks": stocks
+                })
+        
+        return all_watchlists
+    except Exception as e:
+        print(f"❌ Firebase Error (get_all_watchlists): {e}")
+        return []
+
+
 # ============================================
 # Alert Functions
 # ============================================
